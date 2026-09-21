@@ -1,0 +1,75 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: uniassist-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-uniassist_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uniassist_secure_pass_change_in_production}
+      POSTGRES_DB: ${POSTGRES_DB:-uniassist_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-uniassist_admin} -d ${POSTGRES_DB:-uniassist_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - uniassist-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: uniassist-backend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-uniassist_admin}:${POSTGRES_PASSWORD:-uniassist_secure_pass_change_in_production}@db:5432/${POSTGRES_DB:-uniassist_db}
+      - SYNC_DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-uniassist_admin}:${POSTGRES_PASSWORD:-uniassist_secure_pass_change_in_production}@db:5432/${POSTGRES_DB:-uniassist_db}
+      - USE_SQLITE_FALLBACK=False
+      - SECRET_KEY=${SECRET_KEY:-uniassist_dev_secret_key_minimum_32_characters}
+      - BACKEND_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_SEARCH_ENDPOINT=${AZURE_SEARCH_ENDPOINT:-}
+      - AZURE_SEARCH_API_KEY=${AZURE_SEARCH_API_KEY:-}
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - uniassist-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: uniassist-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - uniassist-net
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  uniassist-net:
+    driver: bridge

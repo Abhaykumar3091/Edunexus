@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Page background: very light green-tinted white */
+    --background: 138 40% 97%;
+    --foreground: 210 25% 12%;
+
+    /* Cards: pure white */
+    --card: 0 0% 100%;
+    --card-foreground: 210 25% 12%;
+
+    /* Primary: vivid teal-blue */
+    --primary: 199 89% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary: soft mint */
+    --secondary: 152 45% 92%;
+    --secondary-foreground: 152 30% 25%;
+
+    --muted: 152 20% 94%;
+    --muted-foreground: 210 15% 50%;
+
+    --accent: 199 50% 92%;
+    --accent-foreground: 199 60% 25%;
+
+    --destructive: 0 80% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 152 20% 88%;
+    --input: 152 20% 91%;
+    --ring: 199 80% 45%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #a7d7c5; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #5fb69c; }
+
+/* Bounce animation for chat dots */
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
+.animate-bounce { animation: bounce 1.2s infinite; }
