@@ -65,10 +65,11 @@ export interface ChatResponse {
 export interface AdminStats {
   total_students: number;
   total_faculty?: number;
+  total_users?: number;
   total_documents?: number;
-  total_complaints: number;
-  open_complaints: number;
-  resolved_complaints: number;
+  total_complaints?: number;
+  open_complaints?: number;
+  resolved_complaints?: number;
 }
 
 export interface UserItem {

@@ -7,7 +7,6 @@ import {
   AlertCircle,
   User as UserIcon,
   LogOut,
-  Bell,
   Menu,
   X,
   Sparkles,
@@ -27,7 +26,6 @@ export const StudentLayout: React.FC = () => {
     { label: 'Dashboard', path: '/student/dashboard', icon: LayoutDashboard },
     { label: 'Ask UniAssist AI', path: '/student/chat', icon: Sparkles, highlight: true },
     { label: 'Doc Intelligence Q&A', path: '/student/document-ai', icon: FileText, highlight: true },
-    { label: 'Complaints', path: '/student/complaints', icon: AlertCircle },
     { label: 'Profile', path: '/student/profile', icon: UserIcon },
   ];
 
@@ -119,11 +117,7 @@ export const StudentLayout: React.FC = () => {
             <Badge variant="success" className="text-xs">System Active</Badge>
           </div>
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-500 hover:text-slate-900 rounded-full hover:bg-emerald-50 transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-teal-500 rounded-full ring-2 ring-white" />
-            </button>
-            <div className="flex items-center gap-2.5 pl-3 border-l border-emerald-100">
+            <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal-400 to-blue-500 text-white flex items-center justify-center font-semibold text-xs shadow-sm">
                 {user?.full_name ? user.full_name.charAt(0).toUpperCase() : 'S'}
               </div>

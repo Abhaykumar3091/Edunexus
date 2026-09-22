@@ -1,27 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import {
-  AlertCircle, Sparkles, ArrowRight, Bell,
-  CheckCircle2, FileText, MessageSquare, ShieldCheck,
+  Sparkles, ArrowRight, Bell,
+  CheckCircle2, FileText, MessageSquare, ShieldCheck, Database,
 } from 'lucide-react';
-import { studentService } from '@/services/student';
-import { Complaint } from '@/types/student';
 
 export const StudentDashboardPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-
-  useEffect(() => {
-    studentService.getComplaints().then((res) => res.data && setComplaints(res.data)).catch(() => {});
-  }, []);
 
   const studentName = user?.full_name ? user.full_name.split(' ')[0] : 'Student';
-  const openComplaintsCount = complaints.filter((c) => c.status !== 'RESOLVED' && c.status !== 'CLOSED').length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
@@ -36,7 +28,7 @@ export const StudentDashboardPage: React.FC = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{greeting}, {studentName} 👋</h1>
           <p className="text-teal-100 mt-1.5 text-sm md:text-base max-w-xl">
-            Welcome to your academic cockpit. Ask questions to UniAssist AI, analyze course notes with Document Intelligence, and manage student services.
+            Welcome to your academic cockpit. Ask questions to UniAssist AI, analyze course documents with Document Intelligence, and access university knowledge resources.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
@@ -55,7 +47,7 @@ export const StudentDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Main Highlights Cards */}
+      {/* Main Highlights Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card
           className="border-teal-100 bg-gradient-to-br from-teal-50 to-white hover:shadow-md hover:border-teal-200 transition-all cursor-pointer"
@@ -97,22 +89,22 @@ export const StudentDashboardPage: React.FC = () => {
 
         <Card
           className="border-blue-100 bg-gradient-to-br from-blue-50 to-white hover:shadow-md hover:border-blue-200 transition-all cursor-pointer"
-          onClick={() => navigate('/student/complaints')}
+          onClick={() => navigate('/student/chat')}
         >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-slate-600">Active Grievances</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-600">RAG Knowledge Base</CardTitle>
             <div className="p-2 bg-blue-100 text-blue-600 rounded-xl">
-              <AlertCircle className="h-4 w-4" />
+              <Database className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{openComplaintsCount}</div>
+            <div className="text-2xl font-bold text-slate-900">Indexed</div>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant={openComplaintsCount > 0 ? 'destructive' : 'success'} className="text-[10px] px-1.5 py-0">
-                {openComplaintsCount > 0 ? 'In Progress' : 'No Open Tickets'}
+              <Badge variant="success" className="text-[10px] px-1.5 py-0">
+                Azure AI Search
               </Badge>
             </div>
-            <p className="text-xs text-slate-400 mt-2">{openComplaintsCount > 0 ? 'Assigned to warden/dept' : 'All grievances resolved'}</p>
+            <p className="text-xs text-slate-400 mt-2">Blob Storage & Search connected</p>
           </CardContent>
         </Card>
       </div>
@@ -140,7 +132,7 @@ export const StudentDashboardPage: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-slate-900">Ask University Regulations & Policies</h4>
-                    <p className="text-xs text-slate-500">Hostel rules, library timings, refund policies, and anti-ragging bylaws.</p>
+                    <p className="text-xs text-slate-500">Hostel rules, fee structures, examination ordinances, and scholarships.</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-teal-600 group-hover:translate-x-1 transition-transform" />
@@ -160,22 +152,6 @@ export const StudentDashboardPage: React.FC = () => {
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-sky-600 group-hover:translate-x-1 transition-transform" />
-              </div>
-
-              <div
-                onClick={() => navigate('/student/complaints')}
-                className="flex items-center justify-between p-4 rounded-xl border border-blue-100 bg-blue-50/50 hover:bg-blue-50 transition-all cursor-pointer group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-sm group-hover:scale-105 transition-transform">
-                    <AlertCircle className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900">Student Grievance Redressal</h4>
-                    <p className="text-xs text-slate-500">Submit hostel, academic, or infrastructure tickets with real-time status tracking.</p>
-                  </div>
-                </div>
-                <ArrowRight className="h-4 w-4 text-blue-600 group-hover:translate-x-1 transition-transform" />
               </div>
             </CardContent>
           </Card>
@@ -218,7 +194,7 @@ export const StudentDashboardPage: React.FC = () => {
                 onClick={() => navigate('/student/chat')}
                 className="w-full text-left p-2.5 rounded-xl border border-teal-100 bg-white hover:border-teal-300 hover:bg-teal-50/50 transition-all cursor-pointer"
               >
-                <p className="text-xs font-medium text-slate-900">"What are the hostel in-time rules?"</p>
+                <p className="text-xs font-medium text-slate-900">"What are the hostel silence hours?"</p>
                 <p className="text-[10px] text-teal-600 mt-0.5 flex items-center gap-1">
                   <CheckCircle2 className="h-3 w-3" /> Grounded in official University SOPs
                 </p>
@@ -227,8 +203,8 @@ export const StudentDashboardPage: React.FC = () => {
                 onClick={() => navigate('/student/chat')}
                 className="w-full text-left p-2.5 rounded-xl border border-blue-100 bg-white hover:border-blue-300 hover:bg-blue-50/50 transition-all cursor-pointer"
               >
-                <p className="text-xs font-medium text-blue-900">"How to register a hostel grievance?"</p>
-                <p className="text-[10px] text-blue-600 mt-0.5">Direct ticket routing</p>
+                <p className="text-xs font-medium text-blue-900">"What is the fee structure for MBA 2026?"</p>
+                <p className="text-[10px] text-blue-600 mt-0.5">Fee & Scholarship rules</p>
               </button>
             </CardContent>
           </Card>

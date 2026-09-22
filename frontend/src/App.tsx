@@ -15,7 +15,6 @@ import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
 import { ChatPage } from '@/pages/student/ChatPage';
 import { DocumentIntelligencePage } from '@/pages/student/DocumentIntelligencePage';
-import { ComplaintsPage } from '@/pages/student/ComplaintsPage';
 import { ProfilePage } from '@/pages/student/ProfilePage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 
@@ -46,7 +45,6 @@ export const App: React.FC = () => {
             <Route path="dashboard" element={<StudentDashboardPage />} />
             <Route path="chat" element={<ChatPage />} />
             <Route path="document-ai" element={<DocumentIntelligencePage />} />
-            <Route path="complaints" element={<ComplaintsPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="notifications" element={<StudentDashboardPage />} />
           </Route>
@@ -65,7 +63,6 @@ export const App: React.FC = () => {
             <Route path="students" element={<AdminDashboardPage />} />
             <Route path="faculty" element={<AdminDashboardPage />} />
             <Route path="documents" element={<AdminDashboardPage />} />
-            <Route path="complaints" element={<AdminDashboardPage />} />
             <Route path="analytics" element={<AdminDashboardPage />} />
             <Route path="settings" element={<AdminDashboardPage />} />
           </Route>

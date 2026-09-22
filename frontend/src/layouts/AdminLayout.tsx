@@ -9,7 +9,6 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Bell,
   Menu,
   X,
   Database,
@@ -29,7 +28,6 @@ export const AdminLayout: React.FC = () => {
     { label: 'Student Directory', path: '/admin/students', icon: Users },
     { label: 'Faculty Directory', path: '/admin/faculty', icon: UserCheck },
     { label: 'Knowledge Documents', path: '/admin/documents', icon: FileText },
-    { label: 'Complaints Management', path: '/admin/complaints', icon: AlertTriangle },
     { label: 'Analytics & Audits', path: '/admin/analytics', icon: Database },
     { label: 'System Settings', path: '/admin/settings', icon: Settings },
   ];

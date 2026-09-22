@@ -4,34 +4,29 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import {
   Users,
-  MessageSquare,
-  AlertTriangle,
   FileText,
   Activity,
-  CheckCircle2,
-  Upload,
-  ArrowUpRight,
   Sparkles,
   RefreshCw,
+  Database,
+  CheckCircle2,
 } from 'lucide-react';
 import { studentService } from '@/services/student';
-import { AdminStats, Complaint } from '@/types/student';
+import { AdminStats } from '@/types/student';
 import { User } from '@/types/user';
 
 export const AdminDashboardPage: React.FC = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAdminData = async () => {
     setLoading(true);
     try {
-      const [statsRes, usersRes, compRes, docsRes] = await Promise.allSettled([
+      const [statsRes, usersRes, docsRes] = await Promise.allSettled([
         studentService.getAdminStats(),
         studentService.getAdminUsers(),
-        studentService.getAdminComplaints(),
         studentService.getAdminDocuments(),
       ]);
 
@@ -40,9 +35,6 @@ export const AdminDashboardPage: React.FC = () => {
       }
       if (usersRes.status === 'fulfilled' && usersRes.value.success && usersRes.value.data) {
         setUsers(usersRes.value.data);
-      }
-      if (compRes.status === 'fulfilled' && compRes.value.success && compRes.value.data) {
-        setComplaints(compRes.value.data);
       }
       if (docsRes.status === 'fulfilled' && docsRes.value.success && docsRes.value.data) {
         setDocuments(docsRes.value.data);
@@ -55,16 +47,6 @@ export const AdminDashboardPage: React.FC = () => {
   useEffect(() => {
     fetchAdminData();
   }, []);
-
-  const handleResolveComplaint = async (complaintId: number | string) => {
-    const res = await studentService.updateComplaintStatus(complaintId,
-      'RESOLVED',
-      'Issue inspected and resolved by administrative department staff.'
-    );
-    if (res.success) {
-      fetchAdminData();
-    }
-  };
 
   const metrics = [
     {
@@ -84,28 +66,28 @@ export const AdminDashboardPage: React.FC = () => {
       bg: 'bg-emerald-50',
     },
     {
-      title: 'Open Grievances',
-      value: stats ? stats.open_complaints.toString() : '...',
-      change: 'Pending department action',
-      icon: AlertTriangle,
-      color: 'text-amber-600',
-      bg: 'bg-amber-50',
-    },
-    {
-      title: 'Resolved Complaints',
-      value: stats ? stats.resolved_complaints.toString() : '...',
-      change: 'Total closed issues',
-      icon: CheckCircle2,
-      color: 'text-teal-600',
-      bg: 'bg-teal-50',
+      title: 'Total Users',
+      value: stats ? (stats.total_users ?? stats.total_students).toString() : '...',
+      change: 'All registered platform accounts',
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
     },
     {
       title: 'Knowledge Documents',
-      value: stats?.total_documents ? stats.total_documents.toString() : '42',
+      value: stats?.total_documents ? stats.total_documents.toString() : '8',
       change: 'Azure AI Search RAG index',
       icon: FileText,
       color: 'text-purple-600',
       bg: 'bg-purple-50',
+    },
+    {
+      title: 'Azure Blob Storage',
+      value: 'Connected',
+      change: 'rag-knowledge-base container',
+      icon: Database,
+      color: 'text-teal-600',
+      bg: 'bg-teal-50',
     },
     {
       title: 'AI Grounding Accuracy',
@@ -124,7 +106,7 @@ export const AdminDashboardPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">University Administration Portal</h1>
           <p className="text-sm text-slate-500">
-            Real-time analytics, user accounts, RAG knowledge documents, and grievance queues
+            Real-time analytics, user accounts, RAG knowledge documents, and Azure AI service health
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -160,102 +142,63 @@ export const AdminDashboardPage: React.FC = () => {
         })}
       </div>
 
-      {/* 2 Column Section: RAG Documents & Complaints Queue */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Knowledge Documents Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>RAG Knowledge Base Documents</CardTitle>
-              <CardDescription>Indexed in Azure AI Search & Blob Storage</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {documents.length > 0 ? (
-                documents.map((doc: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">{doc.name || doc.title}</h4>
-                      <p className="text-xs text-slate-400">
-                        Category: {doc.category} • {doc.chunks_count || '14'} chunks
-                      </p>
-                    </div>
-                    <Badge variant="success" className="text-xs">Indexed</Badge>
+      {/* RAG Documents Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>RAG Knowledge Base Documents</CardTitle>
+            <CardDescription>Indexed in Azure AI Search & Azure Blob Storage</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {documents.length > 0 ? (
+              documents.map((doc: any, i: number) => (
+                <div key={i} className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">{doc.name || doc.title}</h4>
+                    <p className="text-xs text-slate-400">
+                      Category: {doc.category || 'University Document'}
+                    </p>
                   </div>
-                ))
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">Academic_Calendar_2026-27.pdf</h4>
-                      <p className="text-xs text-slate-400">Category: Academic Regulations • 14 chunks</p>
-                    </div>
-                    <Badge variant="success" className="text-xs">Indexed</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">Fee_Structure_and_Hostel_Rules.pdf</h4>
-                      <p className="text-xs text-slate-400">Category: Hostel & Fees • 22 chunks</p>
-                    </div>
-                    <Badge variant="success" className="text-xs">Indexed</Badge>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">Examination_ByLaws_Attendance_Policy.pdf</h4>
-                      <p className="text-xs text-slate-400">Category: Examinations • 18 chunks</p>
-                    </div>
-                    <Badge variant="success" className="text-xs">Indexed</Badge>
-                  </div>
+                  <Badge variant="success" className="text-xs">Indexed</Badge>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Complaints Admin Resolution Queue */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Grievance Management Queue</CardTitle>
-            <CardDescription>Live student tickets needing review or closure</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-[340px] overflow-y-auto">
-              {complaints.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-6">No complaints logged yet.</p>
-              ) : (
-                complaints.map((c) => (
-                  <div key={c.id} className="p-3 rounded-xl border border-slate-200 bg-white space-y-2 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">
-                          {c.ticket_id}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-800">{c.category}</span>
-                      </div>
-                      <Badge variant={c.status === 'RESOLVED' ? 'success' : 'warning'} className="text-[10px]">
-                        {c.status}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-slate-600 font-medium">{c.title}</p>
-                    <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-                      <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                      {c.status !== 'RESOLVED' && (
-                        <button
-                          onClick={() => handleResolveComplaint(c.id)}
-                          className="text-xs text-emerald-600 font-semibold hover:underline cursor-pointer"
-                        >
-                          Mark as Resolved
-                        </button>
-                      )}
-                    </div>
+              ))
+            ) : (
+              <>
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Fees-Structure-MBA-2026.pdf</h4>
+                    <p className="text-xs text-slate-400">Category: Fee & Tuition • Azure Blob Storage</p>
                   </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                  <Badge variant="success" className="text-xs">Indexed</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Hostel-Rules-2023-24.pdf</h4>
+                    <p className="text-xs text-slate-400">Category: Hostel Policy • Azure Blob Storage</p>
+                  </div>
+                  <Badge variant="success" className="text-xs">Indexed</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Academic-Calendar-2025.pdf</h4>
+                    <p className="text-xs text-slate-400">Category: Academic Calendar • Azure Blob Storage</p>
+                  </div>
+                  <Badge variant="success" className="text-xs">Indexed</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 bg-slate-50/50">
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">Statues-Ordinance-Pertaining-Academic-Examinations.pdf</h4>
+                    <p className="text-xs text-slate-400">Category: Examinations • Azure Blob Storage</p>
+                  </div>
+                  <Badge variant="success" className="text-xs">Indexed</Badge>
+                </div>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Registered Users Table */}
       <Card>

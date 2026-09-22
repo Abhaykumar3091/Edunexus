@@ -4,7 +4,6 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.user import User
-from app.models.student_data import Student, Complaint
 from app.schemas.student import ChatRequest, ChatResponse, CitationSource
 from app.services.azure_openai import get_ai_response
 
@@ -15,7 +14,7 @@ async def process_chat(request: ChatRequest, current_user: User, db: Session) ->
     conv_id = request.conversation_id or str(uuid.uuid4())
     message = request.message
 
-    # Get AI or fallback mock response
+    # Get AI response grounded in RAG-retrieved documents
     ai_result = await get_ai_response(message, request.history or [])
     answer = ai_result.get("answer", "")
     raw_sources = ai_result.get("sources", [])
@@ -32,15 +31,16 @@ async def process_chat(request: ChatRequest, current_user: User, db: Session) ->
         )
 
     data_sources: List[str] = []
-    # Check if student grievances were referenced
-    if any(k in message.lower() for k in ["complaint", "grievance", "ticket", "issue"]):
-        student = db.query(Student).filter(Student.user_id == current_user.id).first()
-        if student:
-            complaints = db.query(Complaint).filter(Complaint.student_id == student.id).all()
-            if complaints:
-                data_sources.append("Student Grievances DB")
-                c_details = ", ".join([f"{c.ticket_id} ({c.status.value})" for c in complaints])
-                answer += f"\n\n**Your Registered Grievances:** {c_details}"
+
+    # Tag which data sources were used for transparency
+    intent = ai_result.get("intent", "general")
+    if intent == "rag_grounded":
+        # Identify unique source types
+        source_types = set(s.get("source_type", "") for s in raw_sources)
+        if "rag_document" in source_types:
+            data_sources.append("Azure AI Search Knowledge Base")
+        if "blob_document" in source_types:
+            data_sources.append("Azure Blob Storage Documents")
 
     return ChatResponse(
         message=answer,

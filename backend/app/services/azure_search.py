@@ -1,4 +1,4 @@
-﻿"""
+"""
 Azure AI Search Service - RAG retrieval client with graceful fallback.
 
 Index schema (ks-file-531-index) field names:
@@ -30,25 +30,25 @@ def _mock_search(query: str) -> List[CitationSource]:
     if any(k in q for k in ["exam", "examination", "hall ticket"]):
         results = [
             CitationSource(
-                title="Examination Ordinance 2024 - Section 4",
-                snippet="The Controller of Examinations will publish the examination schedule at least 30 days before examinations commence. Hall tickets are mandatory for entry.",
-                source_type="rag_document",
+                document_title="Examination Ordinance 2024 - Section 4",
+                chunk_text="The Controller of Examinations will publish the examination schedule at least 30 days before examinations commence. Hall tickets are mandatory for entry.",
+                relevance_score=0.92,
             ),
         ]
     if any(k in q for k in ["hostel", "accommodation", "room"]):
         results = [
             CitationSource(
-                title="University Hostel Rules 2024 - Chapter 3",
-                snippet="Hostel accommodation is available to full-time students. Priority is given to students residing more than 100 km from campus.",
-                source_type="rag_document",
+                document_title="University Hostel Rules 2024 - Chapter 3",
+                chunk_text="Hostel accommodation is available to full-time students. Priority is given to students residing more than 100 km from campus.",
+                relevance_score=0.90,
             ),
         ]
     elif any(k in q for k in ["scholarship", "financial", "merit", "grant"]):
         results = [
             CitationSource(
-                title="Student Financial Assistance Policy 2024",
-                snippet="Merit Scholarship: Top 5% of students receive 25% tuition waiver. ",
-                source_type="rag_document",
+                document_title="Student Financial Assistance Policy 2024",
+                chunk_text="Merit Scholarship: Top 5% of students receive 25% tuition waiver. ",
+                relevance_score=0.91,
             ),
         ]
 
@@ -93,9 +93,9 @@ async def search_knowledge_base(query: str, top_k: int = 5) -> List[CitationSour
                 if snippet_text.strip():
                     sources.append(
                         CitationSource(
-                            title=str(title_text),
-                            snippet=str(snippet_text)[:600],
-                            source_type="rag_document",
+                            document_title=str(title_text),
+                            chunk_text=str(snippet_text)[:600],
+                            relevance_score=0.90,
                         )
                     )
 

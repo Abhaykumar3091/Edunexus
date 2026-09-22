@@ -1,9 +1,11 @@
 """
-Azure OpenAI Service — Client wrapper with graceful fallback.
+Azure OpenAI Service — Client wrapper with RAG-grounded responses.
 
-If AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY are configured, real Azure
-OpenAI calls are made. Otherwise a structured mock response is returned so the
-app runs fully locally without any Azure credentials.
+Flow:
+  1. Search Azure AI Search index + Blob Storage for relevant document chunks.
+  2. Inject the retrieved chunks into the system prompt as grounding context.
+  3. Call Azure OpenAI to generate a response grounded in the retrieved content.
+  4. If Azure OpenAI is not configured, return a structured mock response.
 """
 import logging
 from typing import List
@@ -67,37 +69,84 @@ def _mock_response(user_message: str) -> dict:
             ],
             "intent": "scholarship_policy",
         }
-    elif any(k in msg for k in ["complaint", "grievance", "issue", "problem"]):
-        return {
-            "answer": (
-                "Students can raise grievances through the **Grievance Redressal Mechanism (GRC Policy 2023)**. "
-                "Submit a complaint via the student portal under 'Raise Complaint'. Each complaint receives a unique "
-                "ticket ID (format: CMP-YYYY-NNNNN). The concerned department must acknowledge within **48 hours** "
-                "and resolve within **15 working days**. Escalation to the Dean is possible if unresolved within 15 days. "
-                "Anonymous complaints are not entertained."
-            ),
-            "sources": [
-                {"title": "GRC Policy 2023", "snippet": "Complaints must be resolved within 15 working days.", "source_type": "mock"},
-                {"title": "Grievance Escalation Procedure", "snippet": "Escalate to Dean after 15 working days if unresolved.", "source_type": "mock"},
-            ],
-            "intent": "complaint_policy",
-        }
     else:
         return {
-            "answer": (                "📅 **Timetable** — check your weekly class schedule, "
-                "📝 **Examinations** — see your exam schedule and seating, "
-                "🗣️ **Complaints** — file a grievance or track ticket status, "
-                "📚 **University Policies** — hostel regulations, scholarships, and more.\n\n"
-                "Please ask me a specific question and I will look it up in the official university knowledge base."
+            "answer": (
+                "Welcome to UniAssist AI! I can help you with:\n\n"
+                "• 📚 **Fee Structure & Tuition** — check course fee schedules and payment details\n"
+                "• 🏠 **Hostel Regulations** — room allotment, silence hours, and mess guidelines\n"
+                "• 📝 **Examinations & Grading** — ordinance rules, attendance criteria, and date sheets\n"
+                "• 🎓 **Scholarships** — merit scholarships and financial assistance schemes\n\n"
+                "Please ask me a question and I will look it up in the official university knowledge base."
             ),
             "sources": [],
             "intent": "general",
         }
 
 
+async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
+    """
+    Retrieve relevant document chunks from Azure AI Search and Blob Storage.
+    Returns (context_text, sources_list).
+    """
+    all_sources: list[dict] = []
+    context_chunks: list[str] = []
+
+    # 1. Try Azure AI Search index
+    try:
+        from app.services.azure_search import search_knowledge_base
+        search_results = await search_knowledge_base(user_message, top_k=5)
+        for src in search_results:
+            snippet = getattr(src, "snippet", "") or getattr(src, "chunk_text", "") or ""
+            title = getattr(src, "title", "") or getattr(src, "document_title", "") or "Knowledge Document"
+            source_type = getattr(src, "source_type", "rag_document")
+            if snippet.strip():
+                context_chunks.append(f"[Source: {title}]\n{snippet}")
+                all_sources.append({
+                    "title": title,
+                    "snippet": snippet[:600],
+                    "source_type": source_type,
+                })
+    except Exception as exc:
+        logger.warning("Azure AI Search retrieval failed: %s", exc)
+
+    # 2. Try Blob Storage direct search (Approach B — fetches & caches blob text)
+    try:
+        from app.services.blob_qa_service import search_blobs_for_answer
+        blob_results = await search_blobs_for_answer(user_message, top_k=4)
+        for src in blob_results:
+            snippet = getattr(src, "snippet", "") or getattr(src, "chunk_text", "") or ""
+            title = getattr(src, "title", "") or getattr(src, "document_title", "") or "Blob Document"
+            source_type = getattr(src, "source_type", "blob_document")
+            if snippet.strip():
+                context_chunks.append(f"[Source: {title}]\n{snippet}")
+                all_sources.append({
+                    "title": title,
+                    "snippet": snippet[:600],
+                    "source_type": source_type,
+                })
+    except Exception as exc:
+        logger.warning("Blob QA retrieval failed: %s", exc)
+
+    # Deduplicate citation sources by title for clean frontend presentation
+    seen_titles = set()
+    unique_sources = []
+    for src in all_sources:
+        key = src["title"].lower().strip()
+        if key not in seen_titles:
+            seen_titles.add(key)
+            unique_sources.append(src)
+
+    # Use all retrieved chunks (up to top 8) for the grounding prompt
+    context_text = "\n\n---\n\n".join(context_chunks[:8]) if context_chunks else ""
+    logger.info("RAG retrieval: %d chunks, %d unique sources for query: '%s'", len(context_chunks), len(unique_sources), user_message[:80])
+    return context_text, unique_sources
+
+
 async def get_ai_response(user_message: str, history: List[ChatMessage]) -> dict:
     """
-    Get AI response from Azure OpenAI, with fallback to mock.
+    Get AI response grounded in RAG-retrieved documents from Azure OpenAI.
+    Falls back to mock if Azure OpenAI is not configured.
     Returns dict with keys: answer, sources, intent.
     """
     if not _is_configured():
@@ -107,25 +156,43 @@ async def get_ai_response(user_message: str, history: List[ChatMessage]) -> dict
     try:
         from openai import AsyncAzureOpenAI
 
+        # ── Step 1: Retrieve relevant document context via RAG ──
+        rag_context, rag_sources = await _retrieve_rag_context(user_message)
+
+        # ── Step 2: Build system prompt with grounding context ──
+        if rag_context:
+            system_content = (
+                "You are UniAssist AI, the official university student support assistant. "
+                "Answer questions about university policies, academic regulations, hostel rules, "
+                "and scholarships ONLY based on the KNOWLEDGE BASE provided below.\n\n"
+                "RULES:\n"
+                "- Answer ONLY from the knowledge base content provided. Do NOT use your general training data.\n"
+                "- Always cite the specific document title or section where you found the answer.\n"
+                "- If the knowledge base does not contain the answer, say: "
+                "'I could not find specific information about this in the university knowledge base. "
+                "Please contact the relevant department for assistance.'\n"
+                "- Never speculate or fabricate information.\n\n"
+                "--- UNIVERSITY KNOWLEDGE BASE ---\n"
+                f"{rag_context}\n"
+                "--- END KNOWLEDGE BASE ---"
+            )
+        else:
+            system_content = (
+                "You are UniAssist AI, the official university student support assistant. "
+                "Answer questions about university policies, academic regulations, hostel rules, "
+                "and scholarships ONLY based on the provided knowledge. "
+                "Always cite the specific regulation or policy document. "
+                "If you cannot find the answer in the knowledge base, say so explicitly "
+                "and direct the student to the appropriate department. Never speculate."
+            )
+
         client = AsyncAzureOpenAI(
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
             api_key=settings.AZURE_OPENAI_API_KEY,
             api_version=settings.AZURE_OPENAI_API_VERSION,
         )
 
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are UniAssist AI, the official university student support assistant. "
-                    "Answer questions about university policies, academic regulations, hostel rules, "
-                    "and scholarships ONLY based on the provided knowledge. "
-                    "Always cite the specific regulation or policy document. "
-                    "If you cannot find the answer in the knowledge base, say so explicitly "
-                    "and direct the student to the appropriate department. Never speculate."
-                ),
-            }
-        ]
+        messages = [{"role": "system", "content": system_content}]
 
         for h in history[-6:]:  # last 6 messages for context
             messages.append({"role": h.role, "content": h.content})
@@ -140,11 +207,20 @@ async def get_ai_response(user_message: str, history: List[ChatMessage]) -> dict
         )
 
         answer = response.choices[0].message.content or "No response generated."
-        return {
-            "answer": answer,
-            "sources": [{"title": "Azure OpenAI Response", "snippet": "Generated by Azure OpenAI", "source_type": "azure_openai"}],
-            "intent": "general",
-        }
+
+        # ── Step 3: Return answer with RAG sources ──
+        if rag_sources:
+            return {
+                "answer": answer,
+                "sources": rag_sources,
+                "intent": "rag_grounded",
+            }
+        else:
+            return {
+                "answer": answer,
+                "sources": [{"title": "Azure OpenAI Response", "snippet": "Generated by Azure OpenAI", "source_type": "azure_openai"}],
+                "intent": "general",
+            }
 
     except Exception as exc:
         logger.error("Azure OpenAI call failed: %s — falling back to mock.", exc)
