@@ -95,7 +95,7 @@ async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
     # 1. Try Azure AI Search index
     try:
         from app.services.azure_search import search_knowledge_base
-        search_results = await search_knowledge_base(user_message, top_k=5)
+        search_results = await search_knowledge_base(user_message, top_k=15)
         for src in search_results:
             snippet = getattr(src, "snippet", "") or getattr(src, "chunk_text", "") or ""
             title = getattr(src, "title", "") or getattr(src, "document_title", "") or "Knowledge Document"
@@ -104,7 +104,7 @@ async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
                 context_chunks.append(f"[Source: {title}]\n{snippet}")
                 all_sources.append({
                     "title": title,
-                    "snippet": snippet[:600],
+                    "snippet": snippet[:3000],
                     "source_type": source_type,
                 })
     except Exception as exc:
@@ -113,7 +113,7 @@ async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
     # 2. Try Blob Storage direct search (Approach B — fetches & caches blob text)
     try:
         from app.services.blob_qa_service import search_blobs_for_answer
-        blob_results = await search_blobs_for_answer(user_message, top_k=4)
+        blob_results = await search_blobs_for_answer(user_message, top_k=15)
         for src in blob_results:
             snippet = getattr(src, "snippet", "") or getattr(src, "chunk_text", "") or ""
             title = getattr(src, "title", "") or getattr(src, "document_title", "") or "Blob Document"
@@ -122,7 +122,7 @@ async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
                 context_chunks.append(f"[Source: {title}]\n{snippet}")
                 all_sources.append({
                     "title": title,
-                    "snippet": snippet[:600],
+                    "snippet": snippet[:3000],
                     "source_type": source_type,
                 })
     except Exception as exc:
@@ -137,8 +137,8 @@ async def _retrieve_rag_context(user_message: str) -> tuple[str, list[dict]]:
             seen_titles.add(key)
             unique_sources.append(src)
 
-    # Use all retrieved chunks (up to top 8) for the grounding prompt
-    context_text = "\n\n---\n\n".join(context_chunks[:8]) if context_chunks else ""
+    # Use retrieved chunks (up to top 25) for the grounding prompt (max context window)
+    context_text = "\n\n---\n\n".join(context_chunks[:25]) if context_chunks else ""
     logger.info("RAG retrieval: %d chunks, %d unique sources for query: '%s'", len(context_chunks), len(unique_sources), user_message[:80])
     return context_text, unique_sources
 
@@ -199,7 +199,7 @@ async def get_ai_response(user_message: str, history: List[ChatMessage]) -> dict
             model=settings.AZURE_OPENAI_CHAT_DEPLOYMENT,
             messages=messages,
             temperature=0.1,
-            max_tokens=1000,
+            max_tokens=4096,
         )
 
         answer = response.choices[0].message.content or "No response generated."

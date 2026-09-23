@@ -23,7 +23,23 @@ VALID_DAYS = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 # ---------------------------------------------------------------------------
 
 async def extract_text_from_document(filename: str, file_bytes: bytes) -> str:
-    """Run Azure Document Intelligence prebuilt-layout on the file. Returns raw text."""
+    """Run PyMuPDF for PDFs or Azure Document Intelligence prebuilt-layout on images. Returns raw text."""
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+
+    # Strategy 1: For PDFs, use PyMuPDF for complete multi-page extraction
+    if ext == "pdf" or file_bytes.startswith(b"%PDF"):
+        try:
+            import pymupdf
+            doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+            pages = [page.get_text().strip() for page in doc if page.get_text() and page.get_text().strip()]
+            doc.close()
+            text = "\n\n".join(pages)
+            if len(text.strip()) > 30:
+                logger.info("PyMuPDF extracted %d chars for timetable '%s'", len(text), filename)
+                return text
+        except Exception as e:
+            logger.warning("PyMuPDF timetable extraction failed: %s", e)
+
     if (
         settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
         and settings.AZURE_DOCUMENT_INTELLIGENCE_KEY

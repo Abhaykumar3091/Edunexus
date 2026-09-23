@@ -55,7 +55,7 @@ def _mock_search(query: str) -> List[CitationSource]:
     return results
 
 
-async def search_knowledge_base(query: str, top_k: int = 5) -> List[CitationSource]:
+async def search_knowledge_base(query: str, top_k: int = 20) -> List[CitationSource]:
     """
     Search the Azure AI Search index for relevant documents.
     Uses the correct field names for the ks-file-531-index schema.
@@ -94,7 +94,7 @@ async def search_knowledge_base(query: str, top_k: int = 5) -> List[CitationSour
                     sources.append(
                         CitationSource(
                             document_title=str(title_text),
-                            chunk_text=str(snippet_text)[:600],
+                            chunk_text=str(snippet_text)[:3000],
                             relevance_score=0.90,
                         )
                     )

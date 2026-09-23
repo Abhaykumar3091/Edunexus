@@ -73,7 +73,6 @@ async def _extract_text(filename: str, file_bytes: bytes) -> str:
                         poller = await client.begin_analyze_document(
                             model_id="prebuilt-read",
                             body=AnalyzeDocumentRequest(bytes_source=file_bytes),
-                            pages="1-4",
                         )
                         result = await poller.result()
                         if hasattr(result, "content") and result.content:
@@ -116,12 +115,12 @@ def _chunk_document(doc_title: str, full_text: str) -> List[DocumentChunk]:
             current_lines.append(stripped)
         else:
             current_lines.append(stripped)
-            # If current block gets too large (> 1200 chars), split into sub-chunk
+            # If current block gets too large (> 2500 chars), split into sub-chunk
             current_text = "\n".join(current_lines)
-            if len(current_text) >= 1200:
+            if len(current_text) >= 2500:
                 chunks.append(DocumentChunk(doc_title, current_section, current_text))
-                # Keep last 2 lines as overlap
-                current_lines = current_lines[-2:]
+                # Keep last 3 lines as overlap
+                current_lines = current_lines[-3:]
 
     if current_lines:
         chunk_text = "\n".join(current_lines).strip()
@@ -248,7 +247,7 @@ def _keyword_score(text: str, query_words: List[str]) -> float:
     return score
 
 
-async def search_blobs_for_answer(query: str, top_k: int = 6) -> List[CitationSource]:
+async def search_blobs_for_answer(query: str, top_k: int = 20) -> List[CitationSource]:
     """
     Search indexed knowledge base using Hybrid Semantic Vector + Keyword retrieval.
     """

@@ -1,4 +1,4 @@
-﻿"""
+"""
 RAG Indexer Service
 ===================
 Extracts text from uploaded PDFs, chunks it, generates embeddings,
@@ -20,8 +20,8 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 120
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 200
 DI_MAX_BYTES = 4 * 1024 * 1024   # 4 MB threshold for Document Intelligence
 
 
@@ -51,16 +51,19 @@ def _file_uid(filename: str, chunk_index: int) -> str:
 # ── Text extraction ────────────────────────────────────────────────────────────
 
 def _extract_with_pymupdf(file_bytes: bytes) -> str:
-    """Fast text extraction using PyMuPDF - handles large PDFs."""
+    """Fast, complete multi-page text extraction using PyMuPDF - handles any number of pages."""
     try:
         import pymupdf  # type: ignore
         doc = pymupdf.open(stream=file_bytes, filetype="pdf")
+        page_count = len(doc)
         pages_text = []
-        for page in doc:
-            pages_text.append(page.get_text())
+        for idx, page in enumerate(doc):
+            t = page.get_text()
+            if t.strip():
+                pages_text.append(f"=== PAGE {idx + 1} ===\n{t.strip()}")
         doc.close()
-        result = "\n".join(pages_text)
-        logger.info("PyMuPDF extracted %d chars.", len(result))
+        result = "\n\n".join(pages_text)
+        logger.info("PyMuPDF extracted %d pages, %d chars.", page_count, len(result))
         return result
     except Exception as exc:
         logger.error("PyMuPDF extraction failed: %s", exc)
@@ -112,11 +115,11 @@ async def _extract_with_document_intelligence(filename: str, file_bytes: bytes) 
 
 async def extract_text_from_bytes(filename: str, file_bytes: bytes) -> str:
     """
-    Tiered extraction:
+    Complete multi-page extraction:
       1. Plain text -> direct decode
-      2. PDF <= 4MB  -> Azure Document Intelligence (best OCR)
-      3. PDF > 4MB   -> PyMuPDF (fast, no size limit)
-      4. Fallback    -> PyMuPDF anyway
+      2. PDF -> PyMuPDF (extracts all 1-100+ pages uncapped)
+      3. Scanned PDF fallback -> Azure Document Intelligence
+      4. Other -> PyMuPDF fallback
     """
     ext = filename.lower().rsplit(".", 1)[-1]
 
@@ -125,17 +128,18 @@ async def extract_text_from_bytes(filename: str, file_bytes: bytes) -> str:
         return file_bytes.decode("utf-8", errors="ignore")
 
     if ext == "pdf":
-        if len(file_bytes) <= DI_MAX_BYTES:
-            logger.info("Using Document Intelligence for '%s' (%d KB).", filename, len(file_bytes)//1024)
-            text = await _extract_with_document_intelligence(filename, file_bytes)
-            if text.strip():
-                return text
-            # DI failed or returned nothing - fall through to PyMuPDF
-            logger.info("Document Intelligence returned no text, falling back to PyMuPDF.")
-        else:
-            logger.info("'%s' is %d MB (> 4MB limit), using PyMuPDF directly.", filename, len(file_bytes)//1024//1024)
+        # PyMuPDF extracts all pages without Azure F0 free-tier page drop
+        text = _extract_with_pymupdf(file_bytes)
+        if len(text.strip()) > 50:
+            logger.info("Extracted %d chars across all pages with PyMuPDF for '%s'", len(text), filename)
+            return text
 
-        return _extract_with_pymupdf(file_bytes)
+        # If scanned image PDF with no embedded text, fallback to Azure Document Intelligence OCR
+        logger.info("PyMuPDF found minimal text; attempting Azure Document Intelligence OCR for '%s'", filename)
+        di_text = await _extract_with_document_intelligence(filename, file_bytes)
+        if di_text.strip():
+            return di_text
+        return text
 
     # DOCX / other - try PyMuPDF anyway
     return _extract_with_pymupdf(file_bytes)
