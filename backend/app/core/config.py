@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONTAINER_TIMETABLES: str = "timetable-uploads"
     AZURE_STORAGE_CONTAINER_STUDENT_FILES: str = "student-uploads"
     AZURE_STORAGE_CONTAINER_RAG: str = "rag-knowledge-base"
+    AZURE_RAG_CONTAINER: str = "rag-knowledge-base"
     LOCAL_BLOB_STORAGE_DIR: str = "storage_blobs"
 
     # Azure Key Vault
