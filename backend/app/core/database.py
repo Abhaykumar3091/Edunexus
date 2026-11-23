@@ -40,8 +40,14 @@ else:
     elif database_url.startswith("postgresql://") and not database_url.startswith("postgresql+asyncpg://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-    # Asyncpg does not support sslmode in URL query params; configure SSL context for Heroku Postgres
-    if "sslmode=" in database_url or os.environ.get("DYNO") or "heroku" in database_url:
+    # Asyncpg does not support sslmode in URL query params; configure SSL context for Heroku/Render Postgres
+    if (
+        "sslmode=" in database_url
+        or os.environ.get("DYNO")
+        or "heroku" in database_url
+        or os.environ.get("RENDER")
+        or "render.com" in database_url
+    ):
         if "?" in database_url:
             base_url, query_str = database_url.split("?", 1)
             clean_params = [p for p in query_str.split("&") if not p.startswith("sslmode=")]

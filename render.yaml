@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: edunexus
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: USE_SQLITE_FALLBACK
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
