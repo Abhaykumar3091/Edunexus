@@ -47,14 +47,15 @@ export const documentService = {
     formData.append('file', file);
 
     const token = localStorage.getItem('uniassist_token');
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { Accept: 'application/json' };
     if (token) {
       headers['Authorization'] = 'Bearer ' + token;
     }
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-      const res = await fetch('http://localhost:8000' + API_BASE_URL + '/documents/analyze', {
+      const endpoint = `${API_BASE_URL}/documents/analyze`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: formData,
