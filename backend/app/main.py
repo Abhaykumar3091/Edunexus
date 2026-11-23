@@ -1,10 +1,12 @@
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from app.api.v1 import api_router
@@ -212,12 +214,45 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # Mount API Routers
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+# ------------------------------------------------------------------------------
+# Frontend Static Files & SPA Routing (Heroku / Production Single-Dyno Support)
+# ------------------------------------------------------------------------------
+FRONTEND_DIST_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if not FRONTEND_DIST_DIR.exists():
+    FRONTEND_DIST_DIR = Path.cwd() / "frontend" / "dist"
 
-@app.get("/", tags=["Root"])
-async def root():
-    return {
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "health": f"{settings.API_V1_STR}/health",
-    }
+if FRONTEND_DIST_DIR.exists() and (FRONTEND_DIST_DIR / "index.html").exists():
+    assets_dir = FRONTEND_DIST_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+    @app.get("/", tags=["Root"])
+    async def root(request: Request):
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            return FileResponse(FRONTEND_DIST_DIR / "index.html")
+        return {
+            "app": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "docs": "/docs",
+            "health": f"{settings.API_V1_STR}/health",
+        }
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # Do not intercept API, docs, or schema paths
+        if full_path.startswith("api/") or full_path in ("docs", "redoc", "openapi.json"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = FRONTEND_DIST_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(FRONTEND_DIST_DIR / "index.html")
+else:
+    @app.get("/", tags=["Root"])
+    async def root():
+        return {
+            "app": settings.APP_NAME,
+            "version": settings.APP_VERSION,
+            "docs": "/docs",
+            "health": f"{settings.API_V1_STR}/health",
+        }

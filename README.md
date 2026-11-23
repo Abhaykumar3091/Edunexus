@@ -191,7 +191,28 @@ python -m pytest backend/tests -v
 
 ---
 
-## 8. Azure Cost Management
+## 8. Heroku Cloud Deployment
+
+UniAssist AI is configured for one-click or CLI deployment on Heroku as a unified full-stack service (serving both React SPA and FastAPI backend from a single dyno).
+
+For detailed step-by-step instructions, see [`HEROKU_DEPLOYMENT.md`](HEROKU_DEPLOYMENT.md).
+
+Quick setup:
+```bash
+# Add buildpacks
+heroku buildpacks:add --index 1 heroku/nodejs
+heroku buildpacks:add --index 2 heroku/python
+
+# Add Heroku Postgres
+heroku addons:create heroku-postgresql:essential-0
+
+# Deploy
+git push heroku main
+```
+
+---
+
+## 9. Azure Cost Management
 
 Please consult [`COST_MANAGEMENT.md`](COST_MANAGEMENT.md) for detailed guidelines on:
 - Staying within the student subscription allocation.

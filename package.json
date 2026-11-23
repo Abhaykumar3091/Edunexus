@@ -1,0 +1,13 @@
+{
+  "name": "edunexus-uniassist",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UniAssist AI - University Student Support AI Agent Platform",
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "heroku-postbuild": "cd frontend && npm install && npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
