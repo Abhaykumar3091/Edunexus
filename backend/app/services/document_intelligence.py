@@ -82,51 +82,65 @@ async def parse_text_content(filename: str, file_bytes: bytes) -> Dict[str, Any]
         except Exception as exc:
             logger.warning("PyMuPDF extraction failed for '%s': %s", filename, exc)
 
-    # Strategy 2: If no text was extracted (e.g., scanned PDF image or non-PDF image/doc), try Azure Document Intelligence
-    if not full_text.strip() and settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and settings.AZURE_DOCUMENT_INTELLIGENCE_KEY:
+    # Strategy 2: If no text or minimal text was extracted (< 50 chars, scanned PDF image), try Azure Document Intelligence
+    is_pdf = ext == "pdf" or file_bytes.startswith(b"%PDF")
+    if (len(full_text.strip()) < 50 or not sections) and settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and settings.AZURE_DOCUMENT_INTELLIGENCE_KEY:
         try:
+            from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
             client = DocumentIntelligenceClient(
                 endpoint=settings.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT,
                 credential=AzureKeyCredential(settings.AZURE_DOCUMENT_INTELLIGENCE_KEY)
             )
             async with client:
                 poller = await client.begin_analyze_document(
-                    "prebuilt-layout", 
-                    file_bytes, 
-                    content_type="application/octet-stream"
+                    model_id="prebuilt-read",
+                    body=AnalyzeDocumentRequest(bytes_source=file_bytes),
                 )
                 result = await poller.result()
             
-            if result.pages:
-                page_count = max(len(result.pages), 1)
-            full_text = result.content or ""
-            
-            if result.paragraphs:
-                for idx, para in enumerate(result.paragraphs):
-                    page_num = 1
-                    if para.bounding_regions:
-                        page_num = para.bounding_regions[0].page_number
-                    
-                    title = getattr(para, 'role', f"Page {page_num} Sec {idx + 1}") or f"Page {page_num} Sec {idx + 1}"
-                    sections.append(
-                        DocumentSection(
-                            page_number=page_num,
-                            title=title,
-                            content=para.content,
+            if result.content and len(result.content.strip()) > len(full_text.strip()):
+                full_text = result.content.strip()
+                sections = []
+                if result.pages:
+                    page_count = max(len(result.pages), 1)
+                
+                if hasattr(result, 'paragraphs') and result.paragraphs:
+                    for idx, para in enumerate(result.paragraphs):
+                        page_num = 1
+                        if para.bounding_regions:
+                            page_num = para.bounding_regions[0].page_number
+                        
+                        title = getattr(para, 'role', f"Page {page_num} Sec {idx + 1}") or f"Page {page_num} Sec {idx + 1}"
+                        sections.append(
+                            DocumentSection(
+                                page_number=page_num,
+                                title=title,
+                                content=para.content,
+                            )
                         )
-                    )
-            elif full_text:
-                sections.append(DocumentSection(page_number=1, title="Document Content", content=full_text))
-            logger.info("Azure Document Intelligence extracted %d pages, %d chars from '%s'", page_count, len(full_text), filename)
+                elif hasattr(result, 'pages') and result.pages:
+                    for page in result.pages:
+                        page_lines = [line.content for line in getattr(page, 'lines', []) if getattr(line, 'content', None)]
+                        if page_lines:
+                            sections.append(
+                                DocumentSection(
+                                    page_number=page.page_number,
+                                    title=f"Page {page.page_number}",
+                                    content="\n".join(page_lines),
+                                )
+                            )
+                if not sections and full_text:
+                    sections.append(DocumentSection(page_number=1, title="Document Content", content=full_text))
+                logger.info("Azure Document Intelligence extracted %d pages, %d chars from '%s'", page_count, len(full_text), filename)
         except Exception as e:
             logger.error("Azure Document Intelligence failed: %s", e)
 
-    # Strategy 3: Plain text / UTF-8 fallback
-    if not full_text.strip():
+    # Strategy 3: Plain text / UTF-8 fallback (ONLY for non-PDFs)
+    if not full_text.strip() and not is_pdf:
         logger.warning("Falling back to raw text decode for '%s'", filename)
-        raw_text = file_bytes.decode("utf-8", errors="ignore")
-        full_text = raw_text
-        if raw_text.strip():
+        raw_text = file_bytes.decode("utf-8", errors="ignore").strip()
+        if raw_text:
+            full_text = raw_text
             sections.append(DocumentSection(page_number=1, title="Document Content", content=raw_text))
 
     words = full_text.split()
